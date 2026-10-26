@@ -1,0 +1,18 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>每日推荐 · 拆书房</title><link rel="stylesheet" href="style.css"></head><body>
+<div id="hdr"></div>
+<section class="hero" style="padding-bottom:20px"><div class="container"><div class="eyebrow">DAILY PICK</div><h1>每日推荐</h1><p>每天一本，按日期归档，最新在前。</p>
+<div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" type="search" placeholder="搜索推荐的书名、作者、标签、理由…"></div></div></section>
+<main class="container sec" id="list"></main><div id="ftr"></div>
+<script src="common.js"></script><script src="books/index.js"></script>
+<script>
+document.getElementById("hdr").innerHTML=U.header("recs");document.getElementById("ftr").innerHTML=U.footer();
+let R=[];const box=document.getElementById("list");
+function draw(t){t=(t||"").toLowerCase();const rs=R.filter(r=>!t||[r.title,r.author,(r.tags||[]).join(" "),r.why].join(" ").toLowerCase().includes(t));
+ if(!R.length){box.innerHTML=`<div class="empty"><b>还没有推荐</b>第一条每日推荐发布后会出现在这里，按日期归档。</div>`;return}
+ if(!rs.length){box.innerHTML=`<div class="empty"><b>没有匹配的推荐</b></div>`;return}
+ const g={};rs.forEach(r=>(g[r.date]=g[r.date]||[]).push(r));
+ box.innerHTML=Object.keys(g).sort().reverse().map(d=>`<div class="day">${d.replace(/^(\d+)-(\d+)-(\d+)$/,"$1 年 $2 月 $3 日")}</div><div class="recs">${g[d].map(r=>U.rec(r,window.CATALOG)).join("")}</div>`).join("")}
+document.getElementById("q").oninput=e=>draw(e.target.value);
+U.loadRecs().then(r=>{R=r;draw()});
+</script></body></html>

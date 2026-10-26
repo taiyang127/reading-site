@@ -1,0 +1,53 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>拆书房</title><link rel="stylesheet" href="style.css"></head><body>
+<div id="hdr"></div><div id="main"></div><div id="ftr"></div>
+<script src="common.js"></script>
+<script>
+const srcHost=s=>{try{return /^https?:/.test(s)?new URL(s).host:s}catch(e){return s}};
+const srcA=(s,id)=>/^https?:/.test(s)?`<a${id?` id="${id}"`:""} href="${U.esc(s)}" target="_blank" rel="noopener">${U.esc(srcHost(s))}</a>`:`<span${id?` id="${id}"`:""}>${U.esc(s)}</span>`;
+
+const {esc}=U,slug=U.qs("b");document.getElementById("hdr").innerHTML=U.header("");document.getElementById("ftr").innerHTML=U.footer();
+const M=document.getElementById("main");
+(async()=>{
+ if(!U.okSlug(slug)){M.innerHTML=`<div class="container sec"><div class="empty"><b>找不到这本书</b></div></div>`;return}
+ try{await U.loadScript(`books/${slug}.js`)}catch(e){}
+ const b=(window.BOOKS||{})[slug];if(!b){M.innerHTML=`<div class="container sec"><div class="empty"><b>找不到这本书</b></div></div>`;return}
+ const ebs=await U.ebookStatus(slug);let eb=ebs==='plain'?window.EBOOKS[slug]:ebs==='locked'?{locked:true,chapters:window.__ENC[slug].toc||[]}:null;
+ document.title=b.title+" · 拆书房";
+ let pos={};try{pos=JSON.parse(localStorage.getItem(`pos:${slug}:${eb?"ebook":"guide"}`))||{}}catch(e){}
+ const front=b.chapters.filter(c=>c.kind=="front"),chs=b.chapters.filter(c=>c.kind!="front");
+ const thesis=c=>{for(const x of c.blocks){if(x.type=="props")return x.items[0].value;if(x.type=="section")for(const y of x.blocks)if(y.type=="callout")return y.text}return c.caption||""};
+ const R=(m,id)=>`reader.html?b=${encodeURIComponent(slug)}&m=${m}${id?"#c="+encodeURIComponent(id):""}`;
+ M.innerHTML=`<section class="dhero">${b.cover?`<div class="bg" style="background-image:url('${esc(b.cover)}')"></div>`:""}<div class="container">
+ <div class="dcv"><div class="cv" id="mainCv" title="点击放大">${U.coverBook(b,true)}${b.cover?'<span class="zoom">🔍 放大</span>':""}</div>
+ ${(b.volumes||[]).length>1?`<div class="gal" id="gal">${b.volumes.map((v,i)=>`<button data-i="${i}" class="${i?"":"on"}" title="${esc(v.label)}"><img src="${esc(v.thumb||v.cover)}" alt="${esc(v.label)}"></button>`).join("")}</div><div class="gal-l" id="galL">${esc(b.volumes[0].label)}</div>`:""}
+ ${b.coverSource?`<div class="srcs" style="text-align:center">封面来源：${srcA(b.coverSource,"cvSrc")}</div>`:""}</div>
+ <div><div class="tags" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${[...(b.categories||[]),...(b.tags||[])].map(t=>`<a class="t" href="index.html?c=${encodeURIComponent(t)}">${esc(t)}</a>`).join("")}</div>
+ <h1>${esc(b.title)}</h1><div class="au">${esc(b.author)}</div>${b.edition?`<div class="ed">版本：${esc(b.edition)}</div>`:""}
+ <dl class="meta">${Object.entries(b.meta||{}).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}
+  <dt>本站内容</dt><dd>${eb?`全文电子书 · ${eb.chapters.length} 篇${eb.locked?' 🔒':''}`:"全文未收录"}<br>按章精读版 · ${b.chapterCount} 章${chs.length>b.chapterCount?" ＋ 序跋/附录":""}</dd></dl>
+ <div class="btns">${eb?`<a class="btn pri" href="${R("ebook",pos.c)}">📖 ${pos.c?"继续阅读":"开始阅读"} <small>全文</small></a><a class="btn" href="${R("guide")}">读精读版</a>`
+   :`<a class="btn pri" href="${R("guide",pos.c)}">📖 ${pos.c?"继续阅读":"开始阅读"} <small>按章精读版</small></a>`}</div>
+ ${eb?"":`<div class="srcs">本站未收录此书原文，阅读器展示的是按章精读笔记，并非原书正文。</div>`}
+ ${(b.metaSources||[]).length?`<div class="srcs">书目信息来源：${b.metaSources.map(s=>srcA(s)).join(" · ")}</div>`:""}
+ </div></div></section>
+ <div class="container"><div class="tabs"><button data-t="intro" class="on">简介</button><button data-t="guide">导读分析</button><button data-t="toc">目录</button></div><div class="panel blk" id="panel"></div></div>`;
+ // cover zoom + volume gallery
+ let cur={src:b.cover,label:b.title,source:b.coverSource};
+ document.body.insertAdjacentHTML("beforeend",`<div class="lb" id="lb"><img alt=""><div class="cap"></div></div>`);
+ const lb=document.getElementById("lb");lb.onclick=()=>lb.classList.remove("open");addEventListener("keydown",e=>{if(e.key==="Escape")lb.classList.remove("open")});
+ const mc=document.getElementById("mainCv");if(b.cover)mc.onclick=()=>{lb.querySelector("img").src=cur.src;lb.querySelector(".cap").innerHTML=`${esc(cur.label)} · 来源 ${srcA(cur.source)}`;lb.classList.add("open")};
+ const gal=document.getElementById("gal");if(gal)gal.onclick=e=>{const t=e.target.closest("button");if(!t)return;const v=b.volumes[+t.dataset.i];
+  cur={src:v.cover,label:v.label,source:v.source};mc.querySelector("img").src=v.cover;document.getElementById("galL").textContent=v.label;
+  const a=document.getElementById("cvSrc");if(a){if(/^https?:/.test(v.source))a.href=v.source;a.textContent=srcHost(v.source)}gal.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===t))};
+ const P={
+  intro:`<p>${esc(b.intro)}</p>${front.map(c=>`<h2>${esc(c.title)}</h2>${U.blocks(c.blocks,3)}`).join("")}`,
+  guide:`<p class="status">按章精读版 · 共 ${b.chapterCount} 章。展开查看每章拆读，或<a href="${R("guide")}">在阅读器中翻页阅读</a>。</p>`+chs.map(c=>c.kind=="part"?`<h2>${esc(c.title)}</h2>${U.blocks(c.blocks,3)}`
+   :`<details class="ch"><summary><b>${esc(c.title)}</b><span>${esc(thesis(c).slice(0,40))}${thesis(c).length>40?"…":""}</span></summary>${U.blocks(c.blocks,3)}<p><a href="${R("guide",c.id)}">在阅读器中打开 →</a></p></details>`).join(""),
+  toc:(eb?`<h2>全文目录 <span class="badge">电子书</span></h2><ul class="toc-l">${eb.chapters.map(c=>`<li class="${/^第.+章|^卷/.test(c.title)?"":"pt"}"><a href="${R("ebook",c.id)}">${esc(c.title)}</a></li>`).join("")}</ul>`:"")
+   +`<h2>精读目录 <span class="badge">按章精读版</span></h2><ul class="toc-l">${b.chapters.map(c=>`<li class="${c.kind=="chapter"?"":"pt"}"><a href="${R("guide",c.id)}">${esc(c.title)}</a></li>`).join("")}</ul>`};
+ const show=t=>{document.getElementById("panel").innerHTML=P[t];document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x.dataset.t==t));history.replaceState(null,"","#"+t)};
+ document.querySelector(".tabs").onclick=e=>{if(e.target.dataset.t)show(e.target.dataset.t)};
+ show(P[location.hash.slice(1)]?location.hash.slice(1):"intro");
+})();
+</script></body></html>
