@@ -1,0 +1,43 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>拆书房 · 书库</title><link rel="stylesheet" href="style.css"></head><body>
+<div id="hdr"></div>
+<section class="hero"><div class="container">
+ <div class="eyebrow">READING ROOM</div><h1>拆书房</h1><p>一本书，按章拆开读：封面与版本、分析导读、逐页翻阅的电子书。</p>
+ <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+ <input id="q" type="search" placeholder="搜索书名、作者、标签或导读全文…" autocomplete="off"></div>
+ <div class="chips" id="cats"></div></div></section>
+<main class="container">
+ <section class="sec" id="booksec"><div class="sec-h"><h2>书库</h2><span class="sub" id="count"></span></div><div class="grid" id="grid"></div></section>
+ <section class="sec" id="recsec"><div class="sec-h"><h2>每日推荐</h2><span class="sub">每天一本</span><a class="more" href="recs.html">全部推荐 →</a></div><div id="recs"></div></section>
+</main><div id="ftr"></div>
+<script src="common.js"></script><script src="books/index.js"></script>
+<script>
+const {esc}=U;document.getElementById("hdr").innerHTML=U.header("home");document.getElementById("ftr").innerHTML=U.footer();
+let CAT=[],RECS=[],cat=new URLSearchParams(location.search).get("c")||"",q="";
+const norm=s=>String(s||"").toLowerCase();
+function snip(text,term){const i=norm(text).indexOf(term);if(i<0)return"";const s=Math.max(0,i-22);
+ return (s?"…":"")+esc(text.slice(s,i))+"<mark>"+esc(text.substr(i,term.length))+"</mark>"+esc(text.slice(i+term.length,i+term.length+30))+"…"}
+function render(){
+ const term=norm(q.trim());
+ const books=CAT.filter(b=>!cat||[...b.categories,...b.tags].includes(cat)).map(b=>{
+  if(!term)return{b};const head=[b.title,b.author,...b.categories,...b.tags,Object.values(b.meta).join(" ")].join(" ");
+  if(norm(head).includes(term))return{b};const s=snip(b.searchText,term);return s?{b,s}:null}).filter(Boolean);
+ document.getElementById("count").textContent=(term||cat)?`找到 ${books.length} 本`:`共 ${CAT.length} 本`;
+ document.getElementById("grid").innerHTML=books.length?books.map(({b,s})=>`<a class="bk" href="book.html?b=${encodeURIComponent(b.slug)}">${U.cover(b)}
+  <h3>${esc(b.title)}</h3><div class="au">${esc(b.author)}</div><div class="pm">${esc([b.meta["出版社"],(b.meta["出版日期"]||"").slice(0,4)].filter(Boolean).join(" · "))}</div><div class="tags">${b.categories.map(t=>`<span class="t">${esc(t)}</span>`).join("")}</div>${s?`<div class="hit">导读：${s}</div>`:""}</a>`).join("")
+  :`<div class="empty" style="grid-column:1/-1"><b>没有找到相关书籍</b>换个关键词，或清除分类筛选试试</div>`;
+ const recs=RECS.filter(r=>(!cat||(r.tags||[]).includes(cat))&&(!term||norm([r.title,r.author,(r.tags||[]).join(" "),r.why].join(" ")).includes(term)));
+ const el=document.getElementById("recs");
+ if(!RECS.length)el.innerHTML=`<div class="empty"><b>每日推荐即将开始</b>这里每天会放上一本值得读的书：封面、为什么推、出处。</div>`;
+ else if(!recs.length)el.innerHTML=`<div class="empty"><b>没有符合条件的推荐</b></div>`;
+ else el.innerHTML=`<div class="recs row">${recs.slice(0,term||cat?12:3).map(r=>U.rec(r,CAT)).join("")}</div>`;
+ document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("on",c.dataset.c===cat));
+}
+function chips(){const cnt={},tags={};CAT.forEach(b=>{b.categories.forEach(c=>cnt[c]=(cnt[c]||0)+1);b.tags.forEach(t=>tags[t]=(tags[t]||0)+1)});
+ document.getElementById("cats").innerHTML=`<button class="chip" data-c="">全部</button>`+Object.entries(cnt).map(([c,n])=>`<button class="chip" data-c="${esc(c)}">${esc(c)}<small>${n}</small></button>`).join("")
+ +Object.keys(tags).map(t=>`<button class="chip tag" data-c="${esc(t)}"># ${esc(t)}</button>`).join("");
+ document.getElementById("cats").onclick=e=>{const b=e.target.closest(".chip");if(!b)return;cat=b.dataset.c===cat?"":b.dataset.c;
+  history.replaceState(null,"",cat?"?c="+encodeURIComponent(cat):location.pathname);render()}}
+document.getElementById("q").addEventListener("input",e=>{q=e.target.value;render()});
+(async()=>{CAT=window.CATALOG||await fetch("books/index.json").then(r=>r.json());chips();render();RECS=await U.loadRecs();render()})();
+</script></body></html>
