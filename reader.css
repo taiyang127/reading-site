@@ -42,6 +42,8 @@ body{background:#2a221c;background:
   letter-spacing:.02em;transition:transform .55s cubic-bezier(.32,.72,.25,1);will-change:transform;
   -webkit-font-smoothing:antialiased}
 .flow p{margin:0 0 .35em;text-indent:2em;orphans:3;widows:3}
+.flow p.srcpg{text-indent:0;text-align:center;font-family:var(--sans);font-size:.72em;letter-spacing:.14em;color:var(--mute,#8a8072);margin:1.15em 0 .7em;break-before:avoid}
+.flow p.srcpg::before{content:"";display:block;border-top:1px solid var(--line,#ddd2bd);margin:0 12% .45em}
 .flow p.ni{text-indent:0}
 .flow h1{font-size:1.48em;line-height:1.4;text-align:center;margin:1.8em 0 1.3em;color:var(--ink,#1a2430);letter-spacing:.12em;font-weight:700;break-after:avoid}
 .flow h2,.flow h3,.flow h4{font-size:1.08em;color:var(--acc,#7a2e1c);margin:1.2em 0 .45em;break-after:avoid;text-indent:0;letter-spacing:.06em;font-weight:600}
