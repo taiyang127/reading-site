@@ -28,11 +28,19 @@ function gate(blob){return new Promise(res=>{
 if(!book&&!eb){$("ti").textContent="找不到这本书";return}
 $("back").href=`book.html?b=${encodeURIComponent(slug)}`;
 // normalise to [{id,title,html,part}]
-const ebHtml=c=>`<h1>${esc(c.title)}</h1>`+c.blocks.map((b,i)=>b.t==="img"?`<img src="${esc(b.src)}" alt="${esc(b.alt)}">`:b.t==="h"?(i<3&&c.title.replace(/\s/g,"").includes(b.x.replace(/\s/g,""))?"":`<h3>${esc(b.x)}</h3>`):b.t==="q"?`<blockquote>${esc(b.x)}</blockquote>`:`<p>${esc(b.x)}</p>`).join("");
+function blockHtml(b,i,title){
+ if(b.t==="img")return `<img src="${esc(b.src)}" alt="${esc(b.alt||"")}">`;
+ if(b.t==="pg")return `<p class="srcpg" id="srcp-${b.n}" data-srcp="${b.n}">来源第 ${esc(b.n)} 页${b.k?` · 书口 ${esc(b.k)}`:""}</p>`;
+ if(b.t==="h")return (i<3&&title.replace(/\s/g,"").includes(String(b.x||"").replace(/\s/g,""))?"":`<h3>${esc(b.x)}</h3>`);
+ if(b.t==="q")return `<blockquote>${esc(b.x)}</blockquote>`;
+ if(b.t==="l")return `<p class="ni">${esc(b.x)}</p>`;
+ return `<p>${esc(b.x)}</p>`;
+}
+const ebHtml=c=>`<h1>${esc(c.title)}</h1>`+c.blocks.map((b,i)=>blockHtml(b,i,c.title)).join("");
 // lazy ebooks (eb.lazy): each chapter has src; blocks are loaded on demand
 const CH=mode==="ebook"&&eb.lazy?eb.chapters.map(c=>({id:c.id,title:c.title,src:c.src,part:false,html:null}))
  :mode==="ebook"?eb.chapters.map(c=>({id:c.id,title:c.title,part:!/^第.+章|^[一二三四五六七八九十]+——/.test(c.title)&&c.blocks.filter(b=>b.x).length<6,
-  html:`<h1>${esc(c.title)}</h1>`+c.blocks.map((b,i)=>b.t==="img"?`<img src="${esc(b.src)}" alt="${esc(b.alt)}">`:b.t==="h"?(i<3&&c.title.replace(/\s/g,"").includes(b.x.replace(/\s/g,""))?"":`<h3>${esc(b.x)}</h3>`):b.t==="q"?`<blockquote>${esc(b.x)}</blockquote>`:`<p>${esc(b.x)}</p>`).join("")}))
+  html:ebHtml(c)}))
  :book.chapters.map(c=>({id:c.id,title:c.title,part:c.kind!=="chapter",html:`<h1>${esc(c.title)}</h1>${c.caption?`<p class="ni" style="text-align:center;color:var(--mute)">${esc(c.caption)}</p>`:""}`+U.blocks(c.blocks,2).replace(/<p>/g,'<p class="ni">')}));
 const title=(book&&book.title)||eb.title;document.title=title+" · 阅读";
 $("ti").innerHTML=`${esc(title)}<span class="mode">${mode==="ebook"?"全文":"按章精读版"}</span>`;
@@ -40,7 +48,11 @@ const KEY=`pos:${slug}:${mode}`;let st={};try{st=JSON.parse(localStorage.getItem
 let fs=+localStorage.getItem("reader:fs")||0;
 let ci=0,page=0,pages=1,per=1,stepW=0,flipping=false;
 const h=new URLSearchParams(location.hash.slice(1));
-const want=h.get("c")||st.c;ci=Math.max(0,CH.findIndex(c=>c.id===want));let frac=h.get("c")&&h.get("c")!==st.c?0:(st.f||0);
+let jumpP=h.get("p");
+if(h.get("c"))ci=Math.max(0,CH.findIndex(c=>c.id===h.get("c")));
+else if(jumpP){const i=CH.findIndex(c=>c.html&&c.html.includes(`data-srcp="${jumpP}"`));if(i>=0)ci=i}
+else if(st.c)ci=Math.max(0,CH.findIndex(c=>c.id===st.c));
+let frac=(h.get("c")&&h.get("c")!==st.c)||jumpP?0:(st.f||0);
 // drawer
 $("drawer").innerHTML=(book?`<div style="display:flex;gap:14px;align-items:flex-end;padding:18px 18px 6px"><div style="width:64px;flex:none">${U.coverBook(book)}</div><div><div style="font-family:var(--serif);font-weight:700;font-size:16px">${esc(book.title)}</div><div style="font-size:12.5px;color:var(--mute)">${esc(book.author)}</div></div></div>`:"")+`<h3>目录</h3>`+CH.map((c,i)=>`<a href="#" data-i="${i}" class="${c.part?"pt":""}">${esc(c.title)}</a>`).join("");
 const openD=o=>{$("drawer").classList.toggle("open",o);$("mask").classList.toggle("open",o)};
@@ -76,7 +88,14 @@ async function ensure(i){const c=CH[i];if(!c||c.html!=null)return;const k=`${slu
 async function render(toFrac){if(CH[ci].html==null){$("flow").innerHTML='<p class="chap-end">加载中…</p>';await ensure(ci)}
  $("flow").innerHTML=CH[ci].html+`<p class="chap-end">· ${ci<CH.length-1?"本篇完":"全书完"} ·</p>`;layout();
  const imgs=[...$("flow").querySelectorAll("img")];
- const fin=()=>{measure();page=toFrac==="end"?pages-per:Math.min(pages-per,Math.round((toFrac||0)*pages/per)*per);draw(false)};
+ const fin=()=>{measure();
+  let landed=false;
+  if(jumpP){const el=[...$("flow").querySelectorAll("[data-srcp]")].find(e=>e.dataset.srcp===String(jumpP));
+   if(el){const x=el.getBoundingClientRect().left-$("vp").getBoundingClientRect().left;
+    const target=Math.max(0,Math.floor((x+4)/stepW));page=Math.min(pages-per,target-(target%per));landed=true}
+   jumpP=null}
+  if(!landed)page=toFrac==="end"?pages-per:Math.min(pages-per,Math.round((toFrac||0)*pages/per)*per);
+  draw(false)};
  fin();imgs.forEach(im=>{if(!im.complete)im.onload=im.onerror=()=>{const keep=page/pages;measure();page=Math.min(pages-per,Math.round(keep*pages/per)*per);draw(false)}});}
 function go(i,fr){if(i<0||i>=CH.length)return;ci=i;if(eb&&eb.lazy)CH.forEach((c,j)=>{if(c.src&&Math.abs(j-i)>1)c.html=null});render(fr)}
 function flip(dir){if(flipping)return;const fl=$("flip");
